@@ -1,0 +1,190 @@
+package org.uosSport.polarheartmonitor;
+
+import java.util.Observable;
+
+
+import com.androidplot.xy.SimpleXYSeries;
+
+/**
+ * This handler is specalised for decoding my polar hart rate monitor and get the data from it
+ * Data format is something like this
+ * 
+ * 
+ *   Polar Bluetooth Wearlink packet example;
+ *   Hdr Len Chk Seq Status HeartRate RRInterval_16-bits
+ *    FE  08  F7  06   F1      48          03 64
+ *   where; 
+ *      Hdr always = 254 (0xFE), 
+ *      Chk = 255 - Len
+ *      Seq range 0 to 15
+ *      Status = Upper nibble may be battery voltage
+ *               bit 0 is Beat Detection flag.
+ *               
+ *   src:http://ww.telent.net/2012/5/3/listening_to_a_polar_bluetooth_hrm_in_linux
+ *   
+ *   
+ *   
+ *   Now also work for BTLE (H7) based on the bluetooth protocol. 
+ *   
+ * @author Marco
+ *  FE 08 F7 06 F1 48 03 64  Example packet, the last two segments (03, 64) are the variability 64 = 100 in hex remember
+ *  int foo = Integer.parseInt("1001", 2); in case the RR is indeed in a 16 bit binary value, this should translate it. Should. But nothing much in this program works as it should
+ *
+ */
+public class DataHandler extends Observable{
+	private static DataHandler dd = new DataHandler();
+	
+	//DATA FOR SAVING
+	boolean newValue = true;
+	SimpleXYSeries series1;
+	SimpleXYSeries series2;
+
+	ConnectThread reader;
+	H7ConnectThread H7;
+	
+	//int pos=0;
+	float pos=0;
+
+	//int val=0;
+	float val=0;
+
+	//int min=0;
+	float min =0;
+
+	//int max=0;
+	float max=0;
+	//for the average maths
+	//int data=0;
+	float data=0;
+
+	//int total=0;
+	float total=0;
+
+	int id;
+	
+	private DataHandler(){
+		
+	}
+	
+	public static DataHandler getInstance(){
+		return dd;
+	}
+
+	// iterates through the packet?? hits position 5, then stops?
+
+	public void acqui(int i){
+		if (i==254){ // change this to 03/64? // two if statements, maybe?
+			pos=0;
+		}
+		else if (pos==5){ // change to position 6, which is the variability? 6 and 7 may be the variability  ***SET IT TO FIVE FOR DEFAULT IN DEFAULT DATA***
+			cleanInput(i);
+		}
+		pos++;
+	}
+
+
+	/**
+	public void acqui(int i) {
+	 if (i==0){
+	 	pos=0;
+	 	}
+	 	else if (pos ==6) because 5 is heart rate maybe, so 6 is HRV OR (pos == 03) OR (pos == 64)? Potentially.
+	 	{
+	 	cleanInput(i); // change cleanInput to take its value and make sure it isn't a binary value somehow, then convert to int.
+	 }
+	 pos++;
+	 }
+	 */
+	// if ( i== 03 || i == 64)
+	// or
+	// if (i == 03) { ... cleanInput1 }
+	// else (i == 64) { ... cleanInput2 - save output as RR+1 }
+	
+	public void cleanInput(int i){
+		val=i;
+		if(val!=0){
+			data+=val;//Average maths
+			total++;//Average maths
+		}
+		if(val<min||min==0) // max value
+			min=val;
+		else if(val>max)
+			max=val;
+		setChanged();
+		notifyObservers();
+	}
+
+    public String getLastValue(){
+
+
+        return 60000/val + " BPM"; // change to HRV // this line was original code
+
+		//valHRV = (60*1000)/val; // my addition 1
+		//val = valHRV * 1000;
+    	//return val + " HRV"; // my addition 2
+		// try adding java.time import library, then duration HRVSeconds = 60.00 ?
+	}
+		// was int, now float.
+    public float getLastIntValue(){
+
+        return 60000/val; // 60000 / input value from device calculates variabiltiy since native input is BPM, so this converts from HRV to BPM.
+    }
+	
+	public String getMin(){
+		return "Min " + min + " BPM";
+	}
+	
+	public String getMax(){
+
+		return "Max " + max + " BPM";
+	}
+	
+	public String getAvg(){
+		if(total==0)
+            return "Avg " + 0 + " BPM";
+		return "Avg " + data/total + " BPM";
+	}
+
+	public void setNewValue(boolean newValue) {
+		this.newValue = newValue;
+	}
+
+	public SimpleXYSeries getSeries1() {
+		return series1;
+	}
+
+	public SimpleXYSeries getSeries2() { return series2; }
+
+	public void setSeries1(SimpleXYSeries series1) {
+		this.series1 = series1;
+	}
+
+	public void setSeries2(SimpleXYSeries series2) {
+		this.series2 = series1;
+	}
+
+
+	public ConnectThread getReader() {
+		return reader;
+	}
+
+	public void setReader(ConnectThread reader) {
+		this.reader = reader;
+	}
+	// getID was int, now float.
+
+	public int getID() {
+		return id;
+	}
+	public void setID(int id) {
+		this.id=id;
+	}
+
+	public void setH7(H7ConnectThread H7){
+		this.H7=H7;
+	}
+	public H7ConnectThread getH7(){
+		return H7;
+	}
+	
+}
